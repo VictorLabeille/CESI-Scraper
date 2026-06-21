@@ -1,0 +1,12 @@
+# Copie ce fichier en `auth.curl` (gitignoré) et colle dedans le « Copier comme cURL »
+# d'une requête de page Scenari (DevTools → Réseau → clic droit sur index.html →
+# Copier → Copier comme cURL (bash)).
+#
+# Le scraper en extrait UNIQUEMENT le token `distTk` et le `User-Agent`.
+# Tu peux aussi, plus court, définir la variable d'environnement :
+#   export SCENARI_DISTTK=xxxxxxxx
+#
+# Exemple (token bidon) :
+curl 'https://scenari.cesi.fr/scenari/cas/PGE_A3_FISA_INFO_Mon_Bloc_ETU/index.html' \
+  -b 'distTk=XXXXXXXXXXXX' \
+  -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'

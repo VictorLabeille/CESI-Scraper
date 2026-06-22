@@ -2,6 +2,8 @@
 
 Récupère un **bloc de cours CESI** (plateforme Scenari/Opale, `scenari.cesi.fr`) et le dépose en **Markdown propre** dans le vault Obsidian — matière première d'une synthèse rédigée ensuite.
 
+> ⚠️ **Outil personnel.** Je l'utilise pour récupérer **mes propres cours**, auxquels j'accède via ma session CESI, afin d'en faire mes fiches de révision. **Aucun contenu de cours n'est redistribué ici** : le dépôt ne contient que du code (le token de session et les notes restent en local, hors du repo). Respecte les CGU de ta plateforme et le droit d'auteur des contenus.
+
 ## Documentation
 - [`README.md`](README.md) — installation et usage (ce fichier).
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — comment ça marche (plateforme Scenari, `session.txt`, pipeline).
@@ -70,3 +72,6 @@ Le scraper **n'écrase jamais** une note de synthèse `{Bloc}.md` déjà rédig�
 - Les **tableaux complexes** (cellules fusionnées) sont rendus au mieux par `markdownify`.
 - Les liens vers des ressources du cours (`res/*.pdf`, sous-pages) sont **absolutisés** en URL Scenari : cliquables dans le navigateur (où l'on est connecté), et surtout ils n'amènent plus Obsidian à créer des notes fantômes.
 - Les **QCM** sont rendus en best-effort.
+
+## Licence
+[MIT](LICENSE).

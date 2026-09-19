@@ -1,6 +1,10 @@
 # AGENTS.md — CESI-Scraper
 
 > Cadrage et décisions du projet. Lu en premier par tout agent ouvrant ce dépôt.
+>
+> **`README.md` est une vitrine, en anglais** : présentation et usage, sans état d'avancement.
+> Le technique va dans `docs/`, l'avancement dans la note Obsidian. Ne pas le repasser en
+> français ni y remettre de checklist.
 
 ## But
 Outil qui récupère un **bloc de cours CESI** (plateforme Scenari/Opale, `https://scenari.cesi.fr`) et produit du **Markdown propre**, déposé dans le vault Obsidian, comme matière première d'une **synthèse rédigée ensuite par l'IA**.

@@ -78,6 +78,10 @@ Notions clés, rédigées à partir des pages dans `_src/`.
 """
 PLAN_ANCHOR = "Liste complète des séances / mini-boucles du bloc.\n-"
 
+# Ressources `res/*` téléchargées comme documents de cours ; les autres
+# (zip, csv, xlsx… = données) restent en lien Scenari.
+DOC_EXTS = {".pdf", ".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp"}
+
 # Soup vierge servant d'usine à balises (création de <p> placeholder).
 _FACTORY = BeautifulSoup("", "html.parser")
 
@@ -223,9 +227,10 @@ def prune_empty(content: Tag) -> None:
 # HTML → Markdown
 # --------------------------------------------------------------------------- #
 class Converter:
-    def __init__(self, base_url: str, downloader):
+    def __init__(self, base_url: str, downloader, doc_downloader=None):
         self.base = base_url
         self.download = downloader
+        self.download_doc = doc_downloader
         self._ph: dict[str, str] = {}
 
     def _token(self, md: str) -> str:
@@ -298,11 +303,29 @@ class Converter:
 
         Sinon Obsidian, au clic, crée une note fantôme à la racine du vault.
         Absolus → ouverts dans le navigateur (où l'utilisateur est connecté).
+        Documents de cours (DOC_EXTS) → téléchargés si un dossier est fourni,
+        lien local `file:///` suivi de l'URL Scenari.
         """
         for a in content.find_all("a", href=True):
             href = a["href"]
-            if not re.match(r"^(https?:|mailto:|#)", href):
-                a["href"] = urljoin(self.base, href)
+            if re.match(r"^(https?:|mailto:|#)", href):
+                continue
+            url = urljoin(self.base, href)
+            a["href"] = url
+            ext = os.path.splitext(urlparse(url).path)[1].lower()
+            if self.download_doc and ext in DOC_EXTS:
+                local = self.download_doc(url)
+                if local:
+                    text = a.get_text(" ", strip=True) or local
+                    path = self.download_doc.dir / local
+                    a.replace_with(NavigableString(self._token(
+                        f"[{text}](<{file_uri(path)}>) ([source]({url}))")))
+
+
+def file_uri(path: Path) -> str:
+    """URI `file:///` ouvrable depuis Obsidian sous Windows (`/mnt/x/…` → `X:/…`)."""
+    m = re.match(r"^/mnt/([a-z])/(.*)$", path.as_posix())
+    return f"file:///{m[1].upper()}:/{m[2]}" if m else f"file://{path.as_posix()}"
 
 
 def tidy(md: str) -> str:
@@ -312,21 +335,31 @@ def tidy(md: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Téléchargement d'images
+# Téléchargement (images, documents de cours)
 # --------------------------------------------------------------------------- #
-class ImageDownloader:
-    def __init__(self, session, attach_dir: Path, dry_run: bool, log=print):
+class Downloader:
+    """`kind` ne sert qu'aux messages. `keep_existing` : un fichier déjà présent
+    n'est ni re-téléchargé ni renommé (dossier documents partagé, idempotent)."""
+
+    def __init__(self, session, target_dir: Path, dry_run: bool, log=print,
+                 kind: str = "image", keep_existing: bool = False):
         self.session = session
-        self.dir = attach_dir
+        self.dir = target_dir
         self.dry = dry_run
         self.log = log
+        self.kind = kind
+        self.keep = keep_existing
         self.seen: dict[str, str] = {}   # url → nom local
         self.used: set[str] = set()      # noms déjà attribués
 
     def __call__(self, url: str) -> str | None:
         if url in self.seen:
             return self.seen[url]
-        name = safe_name(os.path.basename(urlparse(url).path)) or "image"
+        name = safe_name(os.path.basename(urlparse(url).path)) or self.kind
+        if self.keep and (self.dir / name).exists():
+            self.seen[url] = name
+            self.used.add(name)
+            return name
         if name in self.used:                       # collision de basename
             stem, ext = os.path.splitext(name)
             i = 2
@@ -339,7 +372,7 @@ class ImageDownloader:
                 self.dir.mkdir(parents=True, exist_ok=True)
                 (self.dir / name).write_bytes(data)
         except Exception as e:                       # noqa: BLE001
-            self.log(f"  ⚠ image non récupérée ({url}): {e}")
+            self.log(f"  ⚠ {self.kind} non récupéré(e) ({url}): {e}")
             return None
         self.seen[url] = name
         self.used.add(name)
@@ -406,8 +439,10 @@ def update_cesi_index(vault, year, title, dry, log=print):
 # Orchestration
 # --------------------------------------------------------------------------- #
 def scrape(index_url: str, vault: Path, disttk: str, ua: str = DEFAULT_UA,
-           dry: bool = False, log=print) -> Path:
-    """Scrape un bloc. `log` reçoit chaque ligne de progression. Lève ScrapeError."""
+           dry: bool = False, log=print, docs_dir: Path | None = None) -> Path:
+    """Scrape un bloc. `log` reçoit chaque ligne de progression. Lève ScrapeError.
+
+    `docs_dir` : dossier où télécharger les documents de cours (None = liens Scenari)."""
     session = make_session(disttk, ua)
     base = index_url.rsplit("/", 1)[0] + "/"
     today = dt.date.today().isoformat()
@@ -431,7 +466,9 @@ def scrape(index_url: str, vault: Path, disttk: str, ua: str = DEFAULT_UA,
 
     bloc_dir = vault / "CESI" / meta["year"].upper() / bloc_title
     src_dir = bloc_dir / "_src"
-    downloader = ImageDownloader(session, bloc_dir / "attachments", dry, log)
+    downloader = Downloader(session, bloc_dir / "attachments", dry, log)
+    doc_downloader = (Downloader(session, docs_dir, dry, log, kind="document", keep_existing=True)
+                      if docs_dir else None)
     if not dry:
         src_dir.mkdir(parents=True, exist_ok=True)
 
@@ -446,7 +483,7 @@ def scrape(index_url: str, vault: Path, disttk: str, ua: str = DEFAULT_UA,
             continue
         fill(content, page, session_data)
         prune_empty(content)
-        body = Converter(page_url, downloader).run(content)
+        body = Converter(page_url, downloader, doc_downloader).run(content)
         fname = "00-index.md" if href.endswith("index.html") else f"{n:02d}-{slugify(label)}.md"
         doc = f"# {label}\n\n*Source : {page_url}*\n\n{body}"
         if not dry:
@@ -456,8 +493,21 @@ def scrape(index_url: str, vault: Path, disttk: str, ua: str = DEFAULT_UA,
     write_bloc_note(bloc_dir, bloc_title, meta, index_url, menu, vault, today, dry, log)
     update_cesi_index(vault, meta["year"], bloc_title, dry, log)
     log(f"✓ Terminé{' (DRY-RUN, rien écrit)' if dry else ''} — "
-        f"{len(menu)} pages, {len(downloader.seen)} image(s) → {bloc_dir}")
+        f"{len(menu)} pages, {len(downloader.seen)} image(s)"
+        + (f", {len(doc_downloader.seen)} document(s) → {docs_dir}" if doc_downloader else "")
+        + f" → {bloc_dir}")
     return bloc_dir
+
+
+CONFIG_FILE = Path(__file__).resolve().parent / "gui_config.json"
+
+
+def remembered_docs_dir(slug: str) -> str | None:
+    """Dossier documents mémorisé pour ce slug dans gui_config.json (gitignoré)."""
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("docs_dirs", {}).get(slug)
+    except (OSError, ValueError):
+        return None
 
 
 def main() -> None:
@@ -466,6 +516,8 @@ def main() -> None:
     ap.add_argument("--vault", default=os.environ.get("CESI_VAULT", DEFAULT_VAULT),
                     help=f"Racine du vault Obsidian (défaut : {DEFAULT_VAULT}).")
     ap.add_argument("--auth", default="auth.curl", help="Chemin du fichier auth.curl.")
+    ap.add_argument("--docs-dir", help="Dossier où télécharger les documents de cours "
+                    "(défaut : celui mémorisé pour ce bloc par l'app, sinon aucun).")
     ap.add_argument("--dry-run", action="store_true", help="N'écrit rien, affiche seulement.")
     args = ap.parse_args()
 
@@ -474,8 +526,10 @@ def main() -> None:
     url = args.url or url_curl
     if not url:
         sys.exit("✗ Aucune URL fournie et aucune trouvée dans auth.curl.")
+    docs_dir = args.docs_dir or remembered_docs_dir(parse_slug(url)["slug"])
     try:
-        scrape(url, Path(args.vault), disttk, ua, args.dry_run)
+        scrape(url, Path(args.vault), disttk, ua, args.dry_run,
+               docs_dir=Path(docs_dir) if docs_dir else None)
     except ScrapeError as e:
         sys.exit(f"✗ {e}")
 

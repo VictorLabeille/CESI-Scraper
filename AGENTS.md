@@ -27,6 +27,7 @@ Vault cible : `/mnt/x/Obsidian/Obsidian Vault/` (= `X:\Obsidian\Obsidian Vault`)
 2. **Sortie = Markdown propre**, un fichier par page, dans `CESI/{Année}/{Bloc}/_src/` du vault (ex. `00-index.md`, `01-theorie-des-jeux.md`…). Conversion HTML→MD en ne gardant que `#content`.
 3. **Pas de distinction fait/à-faire** : on capture tout le contenu ; la synthèse (IA) ira dans `{Bloc}.md` (`type: bloc`).
 4. Le scraper vit dans ce dépôt.
+5. **Documents de cours** (`res/*.pdf|doc|docx|ppt|pptx|odt|odp`) : téléchargés dans un dossier choisi **par bloc** (champ de l'app / `--docs-dir`, mémorisé par slug dans `gui_config.json`, gitignoré : le chemin OneDrive reste hors du dépôt public). Le Markdown pointe `[texte](<file:///X:/…>) ([source](URL Scenari))`. Pas d'extraction texte : un agent lit le fichier via le lien (`X:/` → `/mnt/x/`). Les données (zip, csv, xlsx…) restent en lien Scenari. Arrêté le 2026-10-23.
 
 ## Contrat de sortie (vault)
 - Arborescence cible : `CESI/{A3|A4|A5}/{Bloc}/` avec `{Bloc}.md` (synthèse) + `_src/` (Markdown scrapé).
@@ -38,7 +39,7 @@ Vault cible : `/mnt/x/Obsidian/Obsidian Vault/` (= `X:\Obsidian\Obsidian Vault`)
 - **Auth** : cookie `distTk` lu depuis `auth.curl` (gitignoré, format « Copier comme cURL ») ou `$SCENARI_DISTTK`. 403 → message « recolle un cURL ».
 - **Images** : téléchargées en local dans `attachments/` à côté de la note (choix arrêté avec l'utilisateur), embed `![[fichier]]`.
 - **Sortie** : `_src/NN-page.md` (un par entrée de menu, contenu assemblé + converti), `{Bloc}.md` depuis le template (frontmatter rempli, « Plan du bloc » pré-rempli) **sans écraser** une synthèse existante, et wikilink idempotent dans `CESI.md`.
-- Validé de bout en bout sur 2 blocs (FISE sciences + FISA dev). Limites connues : tableaux à cellules fusionnées, liens vers ressources relatives (`res/*.pdf`), QCM → cf. `README.md`.
+- Validé de bout en bout sur 2 blocs (FISE sciences + FISA dev). Limites connues : tableaux à cellules fusionnées, QCM → cf. `README.md`.
 
 ## Style de collaboration
 L'utilisateur **cadre et valide le design avant d'implémenter** (questions d'architecture, arbitrages explicites). Proposer une reco + le raisonnement, poser les vraies questions, n'écrire le code qu'après feu vert. Il tient aussi à des artefacts propres.

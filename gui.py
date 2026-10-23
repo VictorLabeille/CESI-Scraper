@@ -3,7 +3,7 @@
 
 Colle un « Copier comme cURL », confirme le vault, clique Scraper. Le reste est
 géré par scrape.py. Le cURL est persisté dans auth.curl (gitignoré), le chemin du
-vault dans gui_config.json.
+vault et le dossier documents de chaque bloc dans gui_config.json.
 
 Lancement : .venv/bin/python gui.py     (nécessite python3-tk : sudo apt install python3-tk)
 """
@@ -54,6 +54,15 @@ class App:
         ttk.Entry(row, textvariable=self.vault).pack(side="left", fill="x", expand=True, padx=6)
         ttk.Button(row, text="📁 Parcourir", command=self._browse).pack(side="left")
 
+        # — Dossier documents (mémorisé par bloc ; vide = liens Scenari) —
+        self.docs_dirs: dict = cfg.get("docs_dirs", {})
+        self.slug = ""
+        rowd = ttk.Frame(root); rowd.pack(fill="x", **pad)
+        ttk.Label(rowd, text="Documents :").pack(side="left")
+        self.docs = tk.StringVar()
+        ttk.Entry(rowd, textvariable=self.docs).pack(side="left", fill="x", expand=True, padx=6)
+        ttk.Button(rowd, text="📁 Parcourir", command=self._browse_docs).pack(side="left")
+
         # — Bloc détecté + options —
         row2 = ttk.Frame(root); row2.pack(fill="x", **pad)
         self.detected = tk.StringVar(value="Bloc : —")
@@ -82,17 +91,33 @@ class App:
             return {}
 
     def _save_config(self):
-        CONFIG_FILE.write_text(json.dumps({"vault": self.vault.get()}, indent=2), encoding="utf-8")
+        if self.slug:
+            docs = self.docs.get().strip()
+            if docs:
+                self.docs_dirs[self.slug] = docs
+            else:
+                self.docs_dirs.pop(self.slug, None)
+        CONFIG_FILE.write_text(json.dumps({"vault": self.vault.get(), "docs_dirs": self.docs_dirs},
+                                          indent=2, ensure_ascii=False), encoding="utf-8")
 
     def _browse(self):
         d = filedialog.askdirectory(initialdir=self.vault.get() or "/mnt", title="Choisir le vault Obsidian")
         if d:
             self.vault.set(d)
 
+    def _browse_docs(self):
+        d = filedialog.askdirectory(initialdir=self.docs.get() or "/mnt/x",
+                                    title="Dossier des documents de ce bloc")
+        if d:
+            self.docs.set(d)
+
     def _refresh_detected(self):
         disttk, _ua, url = scrape.parse_curl_text(self.curl.get("1.0", "end"))
         if url:
             m = scrape.parse_slug(url)
+            if m["slug"] != self.slug:  # nouveau bloc → son dossier documents mémorisé
+                self.slug = m["slug"]
+                self.docs.set(self.docs_dirs.get(self.slug, ""))
             tok = "🔑" if disttk else "⚠ pas de token"
             self.detected.set(f"Bloc : {m['slug']}  ·  {m['year']} / {m['program']}  ·  {tok}")
         else:
@@ -125,17 +150,22 @@ class App:
         if not Path(vault).is_dir():
             messagebox.showerror("Vault introuvable", f"Le dossier n'existe pas :\n{vault}")
             return
+        docs = self.docs.get().strip()
+        if docs and not Path(docs).is_dir():
+            messagebox.showerror("Dossier documents introuvable", f"Le dossier n'existe pas :\n{docs}")
+            return
         AUTH_FILE.write_text(curl_text + "\n", encoding="utf-8")  # persiste le token (gitignoré)
         self._save_config()
 
         self.log.configure(state="normal"); self.log.delete("1.0", "end"); self.log.configure(state="disabled")
         self._set_running(True)
-        args = (url, Path(vault), disttk, ua, self.dry.get())
+        args = (url, Path(vault), disttk, ua, self.dry.get(), Path(docs) if docs else None)
         threading.Thread(target=self._worker, args=args, daemon=True).start()
 
-    def _worker(self, url, vault, disttk, ua, dry):
+    def _worker(self, url, vault, disttk, ua, dry, docs_dir):
         try:
-            scrape.scrape(url, vault, disttk, ua, dry, log=lambda m: self.q.put(("log", m)))
+            scrape.scrape(url, vault, disttk, ua, dry, log=lambda m: self.q.put(("log", m)),
+                          docs_dir=docs_dir)
             self.q.put(("done", ""))
         except Exception as e:  # noqa: BLE001
             self.q.put(("error", str(e)))

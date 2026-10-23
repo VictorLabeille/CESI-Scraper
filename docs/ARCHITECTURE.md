@@ -90,6 +90,7 @@ liens). Quelques éléments sont traités à part, via des **placeholders** ins�
 | Maths | `\(…\)` dans `span.txt_mathtex_tl` | `$…$` (et `\[…\]` → `$$…$$`) |
 | Figures/images | `<figure>` / `<img src="res/…">` | image téléchargée → `![[fichier]]` |
 | Liens relatifs | `href="res/…"`, sous-pages | absolutisés en URL Scenari (sinon notes fantômes Obsidian) |
+| Documents de cours | `href="res/*.pdf"` (cf. `DOC_EXTS`) | si `docs_dir` : téléchargés (fichier existant gardé tel quel) → `[texte](<file:///X:/…>) ([source](URL))` |
 
 ## Slug → métadonnées
 
@@ -108,7 +109,8 @@ regex `[A-Z]{2,6}`). `year=a4` et `program=pge-a4-fisa` restent correctement dé
 Le `<title>` de ce bloc vaut « Bloc Stockage et BigData ». Pour rester cohérent avec les blocs
 A3, qui n'ont pas ce préfixe, le dossier, la note et le wikilink ont été renommés **à la main**
 en « Stockage et BigData » après le scraping. ⚠️ Relancer le scraper sur ce bloc recrée un
-dossier `Bloc Stockage et BigData` à côté : il faut alors déplacer `_src/` et supprimer le doublon.
+dossier `Bloc Stockage et BigData` à côté : il faut alors déplacer `_src/` et supprimer le doublon. Contournement plus propre : scraper avec
+`--vault` vers un vault temporaire, puis copier son `_src/` dans le vrai bloc.
 
 `parse_slug()` en tire `year` (`a3`), `program` (`pge-a3-fise` / `pge-a3-fisa`) et une
 `filiere` optionnelle (`info`). Le **titre** vient du `<title>` de la page, jamais

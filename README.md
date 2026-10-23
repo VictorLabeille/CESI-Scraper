@@ -68,9 +68,14 @@ gesture this rare.
 
 ## Known limits
 
-Tables with merged cells are converted best-effort, and so are quizzes. Links to course resources
-are rewritten as absolute Scenari URLs: clickable in the browser where you are logged in, and no
-longer turning into phantom notes in Obsidian.
+Tables with merged cells are converted best-effort, and so are quizzes.
+
+## Course documents
+
+PDF, Word and PowerPoint files linked from a block can be downloaded into a folder of your choice
+(the **Documents** field in the window, remembered per block, or `--docs-dir`). The Markdown then
+links to the local file, followed by the Scenari URL. Other resources (archives, datasets) stay
+as absolute Scenari links, clickable in the browser where you are logged in.
 
 ## Repository map
 

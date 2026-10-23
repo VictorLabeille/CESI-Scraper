@@ -54,6 +54,12 @@ lancement LTI (durée de vie : quelques semaines). Sans lui, tout renvoie
 demanderait de rejouer tout le SSO CAS/LTI — trop fragile pour le gain, donc on
 copie le token à la main (« Copier comme cURL » → `parse_curl_text()`).
 
+⚠️ Constaté le 2026-10-23 : avec un token **expiré** (et non absent), le serveur ne renvoie
+pas de 403 mais une page HTML **200** titrée « Connexion - Dépôt ». Avant correction, le
+scraper annonçait un bloc « Connexion - Dépôt » à 0 page, puis plantait sur
+`json.loads(session.txt)` (`JSONDecodeError: Expecting value`). Désormais `scrape()` lève une
+`ScrapeError` « recolle un cURL » quand l'index n'a pas de `<nav id="outCat">`.
+
 ## Pipeline (`scrape.py`)
 
 ```
@@ -92,7 +98,17 @@ Le SLUG encode les métadonnées, avec des variantes :
 ```
 Etudiant_PGE_A3_FISE_Sciences_fondamentales_de_l_ingenieur_2526
         PGE_A3_FISA_INFO_Developpement_d_applications_distribuees_ETU
+IDB_023_A4_FISA_Informatique_26_27_Octobre_Etudiant_FR
 ```
+
+La troisième forme (bloc A4 « Stockage et BigData », vue le 2026-10-23) sort du motif
+`PGE_…` : préfixe `IDB_023`, filière en casse mixte (`Informatique`, non captée par la
+regex `[A-Z]{2,6}`). `year=a4` et `program=pge-a4-fisa` restent correctement déduits.
+
+Le `<title>` de ce bloc vaut « Bloc Stockage et BigData ». Pour rester cohérent avec les blocs
+A3, qui n'ont pas ce préfixe, le dossier, la note et le wikilink ont été renommés **à la main**
+en « Stockage et BigData » après le scraping. ⚠️ Relancer le scraper sur ce bloc recrée un
+dossier `Bloc Stockage et BigData` à côté : il faut alors déplacer `_src/` et supprimer le doublon.
 
 `parse_slug()` en tire `year` (`a3`), `program` (`pge-a3-fise` / `pge-a3-fisa`) et une
 `filiere` optionnelle (`info`). Le **titre** vient du `<title>` de la page, jamais

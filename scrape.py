@@ -414,6 +414,12 @@ def scrape(index_url: str, vault: Path, disttk: str, ua: str = DEFAULT_UA,
 
     log(f"→ Index : {index_url}")
     index_soup = BeautifulSoup(fetch(session, index_url), "html.parser")
+    # Token expiré : pas de 403 mais une page de connexion en 200, sans menu outCat.
+    if not index_soup.find("nav", id="outCat"):
+        title = index_soup.title.get_text(strip=True) if index_soup.title else "?"
+        raise ScrapeError(f"Pas de menu de bloc sur {index_url} (page « {title} ») — "
+                          "cookie `distTk` expiré ou URL d'index erronée. "
+                          "Recolle un « Copier comme cURL » frais.")
     bloc_title = safe_name(index_soup.title.get_text(strip=True)) if index_soup.title else "Bloc"
     meta = parse_slug(index_url)
     menu = parse_menu(index_soup, bloc_title)
